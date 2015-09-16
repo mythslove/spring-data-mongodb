@@ -21,7 +21,11 @@ import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.Query.*;
 
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.bson.Document;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -33,7 +37,6 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.mapping.PersonPojoStringId;
 
 import com.mongodb.DB;
-import org.bson.Document;
 import com.mongodb.Mongo;
 import com.mongodb.MongoClient;
 import com.mongodb.WriteConcern;
@@ -43,12 +46,16 @@ import com.mongodb.WriteConcern;
  * 
  * @author Mark Pollack
  * @author Christoph Strobl
+ * @author Jordi Llach
  */
 public class ApplicationContextEventTests {
 
 	private static final String COLLECTION_NAME = "personPojoStringId";
+	private static final String ROOT_COLLECTION_NAME = "root";
+	private static final String RELATED_COLLECTION_NAME = "related";
 
-	private final String[] collectionsToDrop = new String[] { COLLECTION_NAME };
+	private final String[] collectionsToDrop = new String[] { COLLECTION_NAME, ROOT_COLLECTION_NAME,
+			RELATED_COLLECTION_NAME };
 
 	private ApplicationContext applicationContext;
 	private MongoTemplate template;
@@ -186,6 +193,154 @@ public class ApplicationContextEventTests {
 
 		assertThat(simpleMappingEventListener.onAfterDeleteEvents.size(), is(1));
 		assertThat(simpleMappingEventListener.onAfterDeleteEvents.get(0).getCollectionName(), is(COLLECTION_NAME));
+	}
+
+	/**
+	 * DATAMONGO-1271 DATAMONGO-1287
+	 */
+	@Test
+	public void loadAndConvertEventsInInnerSimpleDBRef() throws Exception {
+		ParentMappingEventListener simpleMappingEventListener = applicationContext
+				.getBean(ParentMappingEventListener.class);
+		Related embed = new Related(1L, "embed desc");
+		Related ref1 = new Related(2L, "related desc1");
+		Related ref2 = new Related(3L, "related desc2");
+		template.insert(embed);
+		template.insert(ref1);
+		template.insert(ref2);
+
+		Root root = new Root(1L, embed, ref1, ref2, null, null, null, null);
+		template.insert(root);
+
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(0));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(0));
+
+		// initially fetching ROOT document and also eagerly fetching 1 DBRef
+		Root rootR = template.findOne(query(where("id").is(root.getId())), Root.class);
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(2));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(2));
+
+		// checking that no event is fired because those documents were previously eagerly fetched
+		rootR.getRef().getDescription();
+		rootR.getEmbed().getDescription();
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(2));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(2));
+		// checking that accessing lazy DBRef fires 1 more event of each type
+		rootR.getLazyRef().getDescription();
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(3));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(3));
+
+		// checking collectionNames fired
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(0).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(0).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(1).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(1).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(2).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(2).getCollectionName(), is(RELATED_COLLECTION_NAME));
+	}
+
+	/**
+	 * DATAMONGO-1271 DATAMONGO-1287
+	 */
+	@Test
+	public void loadAndConvertEventsInInnerListDBRef() throws Exception {
+		ParentMappingEventListener simpleMappingEventListener = applicationContext
+				.getBean(ParentMappingEventListener.class);
+		Related embed = new Related(1L, "embed desc");
+		Related ref1 = new Related(2L, "related desc1");
+		Related ref2 = new Related(3L, "related desc2");
+		template.insert(embed);
+		template.insert(ref1);
+		template.insert(ref2);
+
+		Root root = new Root(1L, embed, null, null, Arrays.asList(ref1, ref2), Arrays.asList(ref1, ref2), null, null);
+		template.insert(root);
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(0));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(0));
+
+		// initially fetching ROOT document and also eagerly fetching 2 DBRef
+		Root rootR = template.findOne(query(where("id").is(root.getId())), Root.class);
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(3));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(3));
+
+		// checking that no event is fired because those documents were previously eagerly fetched
+		rootR.getListRef().get(0).getDescription();
+		rootR.getListRef().get(1).getDescription();
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(3));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(3));
+
+		// fetching lazily dbref
+		rootR.getListLazy().get(0).getDescription();
+		rootR.getListLazy().get(1).getDescription();
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(5));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(5));
+
+		// checking collectionNames fired
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(0).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(0).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(1).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(1).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(2).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(2).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(3).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(3).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(4).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(4).getCollectionName(), is(RELATED_COLLECTION_NAME));
+	}
+
+	/**
+	 * DATAMONGO-1271 DATAMONGO-1287
+	 */
+	@Test
+	public void loadAndConvertEventsInInnerMapDBRef() throws Exception {
+		ParentMappingEventListener simpleMappingEventListener = applicationContext
+				.getBean(ParentMappingEventListener.class);
+		Related embed = new Related(1L, "embed desc");
+		Related ref1 = new Related(2L, "related desc1");
+		Related ref2 = new Related(3L, "related desc2");
+		template.insert(embed);
+		template.insert(ref1);
+		template.insert(ref2);
+
+		Map<String, Related> mapRef = new HashMap();
+		mapRef.put("1", ref1);
+		mapRef.put("2", ref2);
+		Map<String, Related> mapLazy = new HashMap();
+		mapLazy.put("1", ref1);
+		mapLazy.put("2", ref2);
+
+		Root root = new Root(1L, embed, null, null, null, null, mapRef, mapLazy);
+		template.insert(root);
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(0));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(0));
+
+		// initially fetching ROOT document and also eagerly fetching 2 DBRef (eager map)
+		Root rootR = template.findOne(query(where("id").is(root.getId())), Root.class);
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(3));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(3));
+
+		// checking that accessing eagerly fetched map does not fire any new event
+		Assert.assertEquals(0,
+				rootR.getMapRef().keySet().stream().filter(key -> rootR.getMapRef().get(key).getDescription() == null).count());
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(3));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(3));
+		// accessing lazy map of dbref
+		Assert.assertEquals(0, rootR.getMapLazy().keySet().stream()
+				.filter(key -> rootR.getMapLazy().get(key).getDescription() == null).count());
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.size(), is(5));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.size(), is(5));
+
+		// checking collectionNames fired
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(0).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(0).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(1).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(1).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(2).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(2).getCollectionName(), is(ROOT_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(3).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(3).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterLoadEvents.get(4).getCollectionName(), is(RELATED_COLLECTION_NAME));
+		assertThat(simpleMappingEventListener.onAfterConvertEvents.get(4).getCollectionName(), is(RELATED_COLLECTION_NAME));
 	}
 
 	private void comparePersonAndDbo(PersonPojoStringId p, PersonPojoStringId p2, Document dbo) {
