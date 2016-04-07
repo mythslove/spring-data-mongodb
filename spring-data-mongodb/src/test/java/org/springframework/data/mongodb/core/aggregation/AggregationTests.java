@@ -32,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Scanner;
 
+import org.bson.Document;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDateTime;
@@ -62,11 +63,8 @@ import org.springframework.data.util.Version;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.util.JSON;
 
 /**
  * Tests for {@link MongoTemplate#aggregate(String, AggregationPipeline, Class)}.
@@ -106,7 +104,7 @@ public class AggregationTests {
 	private void queryMongoVersionIfNecessary() {
 
 		if (mongoVersion == null) {
-			DBObject result = mongoTemplate.executeCommand("{ buildInfo: 1 }");
+			Document result = mongoTemplate.executeCommand("{ buildInfo: 1 }");
 			mongoVersion = Version.parse(result.get("version").toString());
 		}
 	}
@@ -146,14 +144,14 @@ public class AggregationTests {
 			mongoTemplate.execute(ZipInfo.class, new CollectionCallback<Void>() {
 
 				@Override
-				public Void doInCollection(MongoCollection<DBObject> collection) throws MongoException, DataAccessException {
+				public Void doInCollection(MongoCollection<Document> collection) throws MongoException, DataAccessException {
 
 					Scanner scanner = null;
 					try {
 						scanner = new Scanner(new BufferedInputStream(new ClassPathResource("zips.json").getInputStream()));
 						while (scanner.hasNextLine()) {
 							String zipInfoRecord = scanner.nextLine();
-							collection.insertOne((DBObject) JSON.parse(zipInfoRecord));
+							collection.insertOne(Document.parse(zipInfoRecord));
 						}
 					} catch (Exception e) {
 						if (scanner != null) {
@@ -536,8 +534,8 @@ public class AggregationTests {
 						.and("spaceUnits").mod("spaceUnits").as("spaceUnitsModSpaceUnits") //
 		);
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> resultList = result.getMappedResults();
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> resultList = result.getMappedResults();
 
 		assertThat(resultList, is(notNullValue()));
 		assertThat((String) resultList.get(0).get("_id"), is(product.id));
@@ -578,8 +576,8 @@ public class AggregationTests {
 
 		);
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> resultList = result.getMappedResults();
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> resultList = result.getMappedResults();
 
 		assertThat(resultList, is(notNullValue()));
 		assertThat((String) resultList.get(0).get("_id"), is(product.id));
@@ -609,8 +607,8 @@ public class AggregationTests {
 						.andExpression("concat(name, '_bubu')").as("name_bubu") //
 		);
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> resultList = result.getMappedResults();
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> resultList = result.getMappedResults();
 
 		assertThat(resultList, is(notNullValue()));
 		assertThat((String) resultList.get(0).get("_id"), is(product.id));
@@ -634,11 +632,11 @@ public class AggregationTests {
 						.andExpression("(netPrice * (1-discountRate)  + [0]) * (1+taxRate)", shippingCosts).as("salesPrice") //
 		);
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> resultList = result.getMappedResults();
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> resultList = result.getMappedResults();
 
 		assertThat(resultList, is(notNullValue()));
-		DBObject firstItem = resultList.get(0);
+		Document firstItem = resultList.get(0);
 		assertThat((String) firstItem.get("_id"), is(product.id));
 		assertThat((String) firstItem.get("name"), is(product.name));
 		assertThat((Double) firstItem.get("salesPrice"),
@@ -659,7 +657,7 @@ public class AggregationTests {
 						.andExpression("unknown + 1").as("netPricePlus1") //
 		);
 
-		mongoTemplate.aggregate(agg, DBObject.class);
+		mongoTemplate.aggregate(agg, Document.class);
 	}
 
 	/**
@@ -680,8 +678,8 @@ public class AggregationTests {
 						.sum("pd.up").as("uplift"), //
 				project("_id", "uplift"));
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> stats = result.getMappedResults();
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> stats = result.getMappedResults();
 
 		assertThat(stats.size(), is(3));
 		assertThat(stats.get(0).get("_id").toString(), is("C"));
@@ -708,11 +706,11 @@ public class AggregationTests {
 				unwind("pd"), //
 				project().and("pd.up").as("up"));
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, DBObject.class);
-		List<DBObject> mappedResults = results.getMappedResults();
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, Document.class);
+		List<Document> mappedResults = results.getMappedResults();
 
 		assertThat(mappedResults, hasSize(6));
-		for (DBObject element : mappedResults) {
+		for (Document element : mappedResults) {
 			assertThat(element.get("up"), is((Object) 1));
 		}
 	}
@@ -738,8 +736,8 @@ public class AggregationTests {
 						.andExpression("toUpper(toLower(stringValue))").as("toUpper") //
 		);
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, DBObject.class);
-		DBObject dbo = results.getUniqueMappedResult();
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, Document.class);
+		Document dbo = results.getUniqueMappedResult();
 
 		assertThat(dbo, is(notNullValue()));
 		assertThat((String) dbo.get("concat"), is("ABCDE"));
@@ -775,8 +773,8 @@ public class AggregationTests {
 						.andExpression("millisecond(dateValue)").as("millisecond") //
 		);
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, DBObject.class);
-		DBObject dbo = results.getUniqueMappedResult();
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, Document.class);
+		Document dbo = results.getUniqueMappedResult();
 
 		assertThat(dbo, is(notNullValue()));
 		assertThat((Integer) dbo.get("dayOfYear"), is(241));
@@ -809,8 +807,8 @@ public class AggregationTests {
 
 		TypedAggregation<DATAMONGO788> aggregation = Aggregation.newAggregation(DATAMONGO788.class, projectFirst, group,
 				project);
-		AggregationResults<DBObject> aggResults = mongoTemplate.aggregate(aggregation, DBObject.class);
-		List<DBObject> items = aggResults.getMappedResults();
+		AggregationResults<Document> aggResults = mongoTemplate.aggregate(aggregation, Document.class);
+		List<Document> items = aggResults.getMappedResults();
 
 		assertThat(items.size(), is(2));
 		assertThat((Integer) items.get(0).get("xPerY"), is(2));
@@ -846,11 +844,11 @@ public class AggregationTests {
 				group("id").push("msgs").as("msgs") //
 		);
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, User.class, DBObject.class);
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, User.class, Document.class);
 
-		List<DBObject> mappedResults = results.getMappedResults();
+		List<Document> mappedResults = results.getMappedResults();
 
-		DBObject firstItem = mappedResults.get(0);
+		Document firstItem = mappedResults.get(0);
 		assertThat(firstItem.get("_id"), is(notNullValue()));
 		assertThat(String.valueOf(firstItem.get("_id")), is("u1"));
 	}
@@ -924,7 +922,7 @@ public class AggregationTests {
 						.and("lastName").as("lastName"), //
 				group("make"));
 
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, DBObject.class);
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Document.class);
 
 		assertThat(result.getMappedResults(), hasSize(3));
 	}
@@ -974,10 +972,10 @@ public class AggregationTests {
 
 		assertThat(result.getMappedResults(), is(empty()));
 
-		DBObject rawResult = result.getRawResults();
+		Document rawResult = result.getRawResults();
 
 		assertThat(rawResult, is(notNullValue()));
-		assertThat(rawResult.containsField("stages"), is(true));
+		assertThat(rawResult.containsKey("stages"), is(true));
 	}
 
 	/**
@@ -993,14 +991,14 @@ public class AggregationTests {
 		mongoTemplate.save(new Person("p3_first", "p3_last", 25));
 		mongoTemplate.save(new Person("p4_first", "p4_last", 15));
 
-		List<DBObject> personsWithAge25 = mongoTemplate.find(Query.query(where("age").is(25)), DBObject.class,
+		List<Document> personsWithAge25 = mongoTemplate.find(Query.query(where("age").is(25)), Document.class,
 				mongoTemplate.getCollectionName(Person.class));
 
 		Aggregation agg = newAggregation(group("age").push(Aggregation.ROOT).as("users"));
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, Person.class, DBObject.class);
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Person.class, Document.class);
 
 		assertThat(result.getMappedResults(), hasSize(3));
-		DBObject o = (DBObject) result.getMappedResults().get(2);
+		Document o = (Document) result.getMappedResults().get(2);
 
 		assertThat(o.get("_id"), is((Object) 25));
 		assertThat((List<?>) o.get("users"), hasSize(2));
@@ -1028,7 +1026,7 @@ public class AggregationTests {
 						.first("timestamp").as("timestamp") //
 						.first(Aggregation.ROOT).as("reservationImage") //
 		);
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, Reservation.class, DBObject.class);
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Reservation.class, Document.class);
 
 		assertThat(result.getMappedResults(), hasSize(2));
 	}
@@ -1066,10 +1064,10 @@ public class AggregationTests {
 		;
 
 		Aggregation agg = newAggregation(dateProjection);
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, ObjectWithDate.class, DBObject.class);
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, ObjectWithDate.class, Document.class);
 
 		assertThat(result.getMappedResults(), hasSize(1));
-		DBObject dbo = result.getMappedResults().get(0);
+		Document dbo = result.getMappedResults().get(0);
 
 		assertThat(dbo.get("hour"), is((Object) dateTime.getHourOfDay()));
 		assertThat(dbo.get("min"), is((Object) dateTime.getMinuteOfHour()));
@@ -1103,12 +1101,12 @@ public class AggregationTests {
 		NearQuery geoNear = NearQuery.near(-73, 40, Metrics.KILOMETERS).num(10).maxDistance(150);
 
 		Aggregation agg = newAggregation(Aggregation.geoNear(geoNear, "distance"));
-		AggregationResults<DBObject> result = mongoTemplate.aggregate(agg, Venue.class, DBObject.class);
+		AggregationResults<Document> result = mongoTemplate.aggregate(agg, Venue.class, Document.class);
 
 		assertThat(result.getMappedResults(), hasSize(3));
 
-		DBObject firstResult = result.getMappedResults().get(0);
-		assertThat(firstResult.containsField("distance"), is(true));
+		Document firstResult = result.getMappedResults().get(0);
+		assertThat(firstResult.containsKey("distance"), is(true));
 		assertThat((Double) firstResult.get("distance"), closeTo(117.620092203928, 0.00001));
 	}
 
@@ -1126,10 +1124,10 @@ public class AggregationTests {
 				match(where("resourceId").is("m1")), //
 				group("counterName").sum("counterVolume").as("totalValue"));
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, DBObject.class);
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, Document.class);
 
 		assertThat(results.getMappedResults(), hasSize(1));
-		DBObject result = results.getMappedResults().get(0);
+		Document result = results.getMappedResults().get(0);
 
 		assertThat(result.get("_id"), is(equalTo((Object) "counter1")));
 		assertThat(result.get("totalValue"), is(equalTo((Object) 100.0)));
@@ -1149,11 +1147,11 @@ public class AggregationTests {
 				lookup("person", "_id", "firstname", "linkedPerson"), //
 				sort(ASC, "id"));
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, User.class, DBObject.class);
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, User.class, Document.class);
 
-		List<DBObject> mappedResults = results.getMappedResults();
+		List<Document> mappedResults = results.getMappedResults();
 
-		DBObject firstItem = mappedResults.get(0);
+		Document firstItem = mappedResults.get(0);
 
 		assertThat(firstItem, isBsonObject().containing("_id", "u1"));
 		assertThat(firstItem, isBsonObject().containing("linkedPerson.[0].firstname", "u1"));
@@ -1174,11 +1172,11 @@ public class AggregationTests {
 				lookup("person", "foreignKey", "firstname", "linkedPerson"), //
 				sort(ASC, "foreignKey", "linkedPerson.firstname"));
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, User.class, DBObject.class);
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, User.class, Document.class);
 
-		List<DBObject> mappedResults = results.getMappedResults();
+		List<Document> mappedResults = results.getMappedResults();
 
-		DBObject firstItem = mappedResults.get(0);
+		Document firstItem = mappedResults.get(0);
 
 		assertThat(firstItem, isBsonObject().containing("foreignKey", "u1"));
 		assertThat(firstItem, isBsonObject().containing("linkedPerson.[0].firstname", "u1"));
@@ -1226,16 +1224,16 @@ public class AggregationTests {
 
 	private void createTagDocuments() {
 
-		MongoCollection<DBObject> coll = mongoTemplate.getCollection(INPUT_COLLECTION);
+		MongoCollection<Document> coll = mongoTemplate.getCollection(INPUT_COLLECTION);
 
 		coll.insertOne(createDocument("Doc1", "spring", "mongodb", "nosql"));
 		coll.insertOne(createDocument("Doc2", "spring", "mongodb"));
 		coll.insertOne(createDocument("Doc3", "spring"));
 	}
 
-	private static BasicDBObject createDocument(String title, String... tags) {
+	private static Document createDocument(String title, String... tags) {
 
-		BasicDBObject doc = new BasicDBObject("title", title);
+		Document doc = new Document("title", title);
 		List<String> tagList = new ArrayList<String>();
 
 		for (String tag : tags) {

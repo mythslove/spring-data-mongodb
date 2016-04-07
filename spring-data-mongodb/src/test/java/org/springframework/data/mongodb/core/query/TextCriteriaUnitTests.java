@@ -15,14 +15,11 @@
  */
 package org.springframework.data.mongodb.core.query;
 
+import org.bson.Document;
 import org.hamcrest.core.IsEqual;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.data.mongodb.core.DBObjectTestUtils;
-
-import com.mongodb.BasicDBObject;
-import com.mongodb.DBObject;
-import com.mongodb.util.JSON;
 
 /**
  * Unit tests for {@link TextCriteria}.
@@ -79,8 +76,8 @@ public class TextCriteriaUnitTests {
 	public void shouldCreateSearchFieldForPhraseCorrectly() {
 
 		TextCriteria criteria = TextCriteria.forDefaultLanguage().matchingPhrase("coffee cake");
-		Assert.assertThat(DBObjectTestUtils.getAsDBObject(criteria.getCriteriaObject(), "$text"),
-				IsEqual.<DBObject> equalTo(new BasicDBObject("$search", "\"coffee cake\"")));
+		Assert.assertThat(DBObjectTestUtils.getAsDocument(criteria.getCriteriaObject(), "$text"),
+				IsEqual.<Document> equalTo(new Document("$search", "\"coffee cake\"")));
 	}
 
 	/**
@@ -111,12 +108,12 @@ public class TextCriteriaUnitTests {
 	public void shouldCreateSearchFieldForNotPhraseCorrectly() {
 
 		TextCriteria criteria = TextCriteria.forDefaultLanguage().notMatchingPhrase("coffee cake");
-		Assert.assertThat(DBObjectTestUtils.getAsDBObject(criteria.getCriteriaObject(), "$text"),
-				IsEqual.<DBObject> equalTo(new BasicDBObject("$search", "-\"coffee cake\"")));
+		Assert.assertThat(DBObjectTestUtils.getAsDocument(criteria.getCriteriaObject(), "$text"),
+				IsEqual.<Document> equalTo(new Document("$search", "-\"coffee cake\"")));
 	}
 
-	private DBObject searchObject(String json) {
-		return new BasicDBObject("$text", JSON.parse(json));
+	private Document searchObject(String json) {
+		return new Document("$text", Document.parse(json));
 	}
 
 }

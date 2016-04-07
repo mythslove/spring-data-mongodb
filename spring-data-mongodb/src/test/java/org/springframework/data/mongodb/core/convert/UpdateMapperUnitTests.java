@@ -16,7 +16,6 @@
 package org.springframework.data.mongodb.core.convert;
 
 import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.collection.IsMapContaining.*;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.data.mongodb.core.DBObjectTestUtils.*;
@@ -29,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.hamcrest.Matcher;
+import org.bson.Document;
 import org.hamcrest.collection.IsIterableContainingInOrder;
 import org.hamcrest.core.Is;
 import org.hamcrest.core.IsEqual;
@@ -55,9 +54,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.mongodb.core.query.Update.Position;
 
-import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;
 import com.mongodb.DBRef;
 
@@ -77,7 +74,7 @@ public class UpdateMapperUnitTests {
 	MongoMappingContext context;
 	UpdateMapper mapper;
 
-	private Converter<NestedEntity, DBObject> writingConverterSpy;
+	private Converter<NestedEntity, Document> writingConverterSpy;
 
 	@Before
 	public void setUp() {
@@ -104,11 +101,11 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("list", new ConcreteChildClass("2", "BAR"));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject list = getAsDBObject(push, "aliased");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document list = getAsDocument(push, "aliased");
 
 		assertThat(list.get("_class"), is((Object) ConcreteChildClass.class.getName()));
 	}
@@ -122,11 +119,11 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("model", new ModelImpl(1));
 		UpdateMapper mapper = new UpdateMapper(converter);
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject set = getAsDBObject(mappedObject, "$set");
-		DBObject modelDbObject = (DBObject) set.get("model");
+		Document set = getAsDocument(mappedObject, "$set");
+		Document modelDbObject = (Document) set.get("model");
 		assertThat(modelDbObject.get("_class"), not(nullValue()));
 	}
 
@@ -139,10 +136,10 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("model.value", 1);
 		UpdateMapper mapper = new UpdateMapper(converter);
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject set = getAsDBObject(mappedObject, "$set");
+		Document set = getAsDocument(mappedObject, "$set");
 		assertThat(set.get("_class"), nullValue());
 	}
 
@@ -155,10 +152,10 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("model", null);
 		UpdateMapper mapper = new UpdateMapper(converter);
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject set = getAsDBObject(mappedObject, "$set");
+		Document set = getAsDocument(mappedObject, "$set");
 		assertThat(set.get("_class"), nullValue());
 	}
 
@@ -171,11 +168,11 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("list.$", new ConcreteChildClass("42", "bubu"));
 
 		UpdateMapper mapper = new UpdateMapper(converter);
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject set = getAsDBObject(mappedObject, "$set");
-		DBObject modelDbObject = getAsDBObject(set, "aliased.$");
+		Document set = getAsDocument(mappedObject, "$set");
+		Document modelDbObject = getAsDocument(set, "aliased.$");
 		assertThat(modelDbObject.get("_class"), is((Object) ConcreteChildClass.class.getName()));
 	}
 
@@ -188,10 +185,10 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("list.$.value", "foo").set("list.$.otherValue", "bar");
 
 		UpdateMapper mapper = new UpdateMapper(converter);
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject set = getAsDBObject(mappedObject, "$set");
+		Document set = getAsDocument(mappedObject, "$set");
 		assertThat(set.get("aliased.$.value"), is((Object) "foo"));
 		assertThat(set.get("aliased.$.otherValue"), is((Object) "bar"));
 	}
@@ -205,13 +202,13 @@ public class UpdateMapperUnitTests {
 		Update update = Update.update("list.$.value", "foo").set("list.$.someObject", new ConcreteChildClass("42", "bubu"));
 
 		UpdateMapper mapper = new UpdateMapper(converter);
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject dbo = getAsDBObject(mappedObject, "$set");
+		Document dbo = getAsDocument(mappedObject, "$set");
 		assertThat(dbo.get("aliased.$.value"), is((Object) "foo"));
 
-		DBObject someObject = getAsDBObject(dbo, "aliased.$.someObject");
+		Document someObject = getAsDocument(dbo, "aliased.$.someObject");
 		assertThat(someObject, is(notNullValue()));
 		assertThat(someObject.get("_class"), is((Object) ConcreteChildClass.class.getName()));
 		assertThat(someObject.get("value"), is((Object) "bubu"));
@@ -225,16 +222,16 @@ public class UpdateMapperUnitTests {
 	public void updateMapperShouldConvertPushCorrectlyWhenCalledWithEachUsingSimpleTypes() {
 
 		Update update = new Update().push("values").each("spring", "data", "mongodb");
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Model.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Model.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject values = getAsDBObject(push, "values");
-		BasicDBList each = getAsDBList(values, "$each");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document values = getAsDocument(push, "values");
+		List<Object> each = getAsDBList(values, "$each");
 
 		assertThat(push.get("_class"), nullValue());
 		assertThat(values.get("_class"), nullValue());
 
-		assertThat(each.toMap(), (Matcher) allOf(hasValue("spring"), hasValue("data"), hasValue("mongodb")));
+		assertThat(each, IsIterableContainingInOrder.<Object> contains("spring", "data", "mongodb"));
 	}
 
 	/**
@@ -245,9 +242,9 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("values").each("spring", "data", "mongodb");
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Model.class));
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject values = getAsDBObject(push, "values");
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Model.class));
+		Document push = getAsDocument(mappedObject, "$push");
+		Document values = getAsDocument(push, "values");
 
 		assertThat(push.get("_class"), nullValue());
 		assertThat(values.get("_class"), nullValue());
@@ -261,15 +258,15 @@ public class UpdateMapperUnitTests {
 	public void updateMapperShouldConvertPushCorrectlyWhenCalledWithEachUsingCustomTypes() {
 
 		Update update = new Update().push("models").each(new ListModel("spring", "data", "mongodb"));
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject model = getAsDBObject(push, "models");
-		BasicDBList each = getAsDBList(model, "$each");
-		BasicDBList values = getAsDBList((DBObject) each.get(0), "values");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document model = getAsDocument(push, "models");
+		List<Object> each = getAsDBList(model, "$each");
+		List<Object> values = getAsDBList((Document) each.get(0), "values");
 
-		assertThat(values.toMap(), (Matcher) allOf(hasValue("spring"), hasValue("data"), hasValue("mongodb")));
+		assertThat(values, IsIterableContainingInOrder.<Object> contains("spring", "data", "mongodb"));
 	}
 
 	/**
@@ -279,14 +276,14 @@ public class UpdateMapperUnitTests {
 	public void updateMapperShouldRetainClassInformationForPushCorrectlyWhenCalledWithEachUsingCustomTypes() {
 
 		Update update = new Update().push("models").each(new ListModel("spring", "data", "mongodb"));
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject model = getAsDBObject(push, "models");
-		BasicDBList each = getAsDBList(model, "$each");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document model = getAsDocument(push, "models");
+		List<Object> each = getAsDBList(model, "$each");
 
-		assertThat(((DBObject) each.get(0)).get("_class").toString(), equalTo(ListModel.class.getName()));
+		assertThat(((Document) each.get(0)).get("_class").toString(), equalTo(ListModel.class.getName()));
 	}
 
 	/**
@@ -296,11 +293,11 @@ public class UpdateMapperUnitTests {
 	public void testUpdateShouldAllowMultiplePushEachForDifferentFields() {
 
 		Update update = new Update().push("category").each("spring", "data").push("type").each("mongodb");
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		assertThat(getAsDBObject(push, "category").containsField("$each"), is(true));
-		assertThat(getAsDBObject(push, "type").containsField("$each"), is(true));
+		Document push = getAsDocument(mappedObject, "$push");
+		assertThat(getAsDocument(push, "category").containsKey("$each"), is(true));
+		assertThat(getAsDocument(push, "type").containsKey("$each"), is(true));
 	}
 
 	/**
@@ -311,14 +308,14 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("key").atPosition(2).each(Arrays.asList("Arya", "Arry", "Weasel"));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject key = getAsDBObject(push, "key");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document key = getAsDocument(push, "key");
 
-		assertThat(key.containsField("$position"), is(true));
+		assertThat(key.containsKey("$position"), is(true));
 		assertThat((Integer) key.get("$position"), is(2));
-		assertThat(getAsDBObject(push, "key").containsField("$each"), is(true));
+		assertThat(getAsDocument(push, "key").containsKey("$each"), is(true));
 	}
 
 	/**
@@ -329,14 +326,14 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("key").atPosition(Position.FIRST).each(Arrays.asList("Arya", "Arry", "Weasel"));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject key = getAsDBObject(push, "key");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document key = getAsDocument(push, "key");
 
-		assertThat(key.containsField("$position"), is(true));
+		assertThat(key.containsKey("$position"), is(true));
 		assertThat((Integer) key.get("$position"), is(0));
-		assertThat(getAsDBObject(push, "key").containsField("$each"), is(true));
+		assertThat(getAsDocument(push, "key").containsKey("$each"), is(true));
 	}
 
 	/**
@@ -347,13 +344,13 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("key").atPosition(Position.LAST).each(Arrays.asList("Arya", "Arry", "Weasel"));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject key = getAsDBObject(push, "key");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document key = getAsDocument(push, "key");
 
-		assertThat(key.containsField("$position"), is(false));
-		assertThat(getAsDBObject(push, "key").containsField("$each"), is(true));
+		assertThat(key.containsKey("$position"), is(false));
+		assertThat(getAsDocument(push, "key").containsKey("$each"), is(true));
 	}
 
 	/**
@@ -364,13 +361,13 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().push("key").atPosition(null).each(Arrays.asList("Arya", "Arry", "Weasel"));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(), context.getPersistentEntity(Object.class));
 
-		DBObject push = getAsDBObject(mappedObject, "$push");
-		DBObject key = getAsDBObject(push, "key");
+		Document push = getAsDocument(mappedObject, "$push");
+		Document key = getAsDocument(push, "key");
 
-		assertThat(key.containsField("$position"), is(false));
-		assertThat(getAsDBObject(push, "key").containsField("$each"), is(true));
+		assertThat(key.containsKey("$position"), is(false));
+		assertThat(getAsDocument(push, "key").containsKey("$each"), is(true));
 	}
 
 	/**
@@ -397,10 +394,10 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().pull("dbRefAnnotatedList.id", "2");
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithDBRefCollection.class));
 
-		DBObject pullClause = getAsDBObject(mappedObject, "$pull");
+		Document pullClause = getAsDocument(mappedObject, "$pull");
 		assertThat(pullClause.get("dbRefAnnotatedList"), is((Object) new DBRef("entity", "2")));
 	}
 
@@ -414,10 +411,10 @@ public class UpdateMapperUnitTests {
 		entity.id = "5";
 
 		Update update = new Update().pull("dbRefAnnotatedList", entity);
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithDBRefCollection.class));
 
-		DBObject pullClause = getAsDBObject(mappedObject, "$pull");
+		Document pullClause = getAsDocument(mappedObject, "$pull");
 		assertThat(pullClause.get("dbRefAnnotatedList"), is((Object) new DBRef("entity", entity.id)));
 	}
 
@@ -438,11 +435,11 @@ public class UpdateMapperUnitTests {
 	public void rendersNestedDbRefCorrectly() {
 
 		Update update = new Update().pull("nested.dbRefAnnotatedList.id", "2");
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(Wrapper.class));
 
-		DBObject pullClause = getAsDBObject(mappedObject, "$pull");
-		assertThat(pullClause.containsField("mapped.dbRefAnnotatedList"), is(true));
+		Document pullClause = getAsDocument(mappedObject, "$pull");
+		assertThat(pullClause.containsKey("mapped.dbRefAnnotatedList"), is(true));
 	}
 
 	/**
@@ -455,10 +452,10 @@ public class UpdateMapperUnitTests {
 		entity.id = "5";
 
 		Update update = new Update().set("dbRefProperty", entity);
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithDBRefCollection.class));
 
-		DBObject setClause = getAsDBObject(mappedObject, "$set");
+		Document setClause = getAsDocument(mappedObject, "$set");
 		assertThat(setClause.get("dbRefProperty"), is((Object) new DBRef("entity", entity.id)));
 	}
 
@@ -469,11 +466,11 @@ public class UpdateMapperUnitTests {
 	public void rendersUpdateAndPreservesKeyForPathsNotPointingToProperty() {
 
 		Update update = new Update().set("listOfInterface.$.value", "expected-value");
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject setClause = getAsDBObject(mappedObject, "$set");
-		assertThat(setClause.containsField("listOfInterface.$.value"), is(true));
+		Document setClause = getAsDocument(mappedObject, "$set");
+		assertThat(setClause.containsKey("listOfInterface.$.value"), is(true));
 	}
 
 	/**
@@ -484,15 +481,15 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update();
 		update.pull("options",
-				new BasicDBObject("_id", new BasicDBObject("$in", converter.convertToMongoType(Arrays.asList(1L, 2L)))));
+				new Document("_id", new Document("$in", converter.convertToMongoType(Arrays.asList(1L, 2L)))));
 
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject setClause = getAsDBObject(mappedObject, "$pull");
-		DBObject options = getAsDBObject(setClause, "options");
-		DBObject idClause = getAsDBObject(options, "_id");
-		BasicDBList inClause = getAsDBList(idClause, "$in");
+		Document setClause = getAsDocument(mappedObject, "$pull");
+		Document options = getAsDocument(setClause, "options");
+		Document idClause = getAsDocument(options, "_id");
+		List<Object> inClause = getAsDBList(idClause, "$in");
 
 		assertThat(inClause, IsIterableContainingInOrder.<Object> contains(1L, 2L));
 	}
@@ -505,14 +502,14 @@ public class UpdateMapperUnitTests {
 	public void testUpdateShouldApply$addToSetCorrectlyWhenUsedWith$each() {
 
 		Update update = new Update().addToSet("values").each("spring", "data", "mongodb");
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ListModel.class));
 
-		DBObject addToSet = getAsDBObject(mappedObject, "$addToSet");
-		DBObject values = getAsDBObject(addToSet, "values");
-		BasicDBList each = getAsDBList(values, "$each");
+		Document addToSet = getAsDocument(mappedObject, "$addToSet");
+		Document values = getAsDocument(addToSet, "values");
+		List<Object> each = getAsDBList(values, "$each");
 
-		assertThat(each.toMap(), (Matcher) allOf(hasValue("spring"), hasValue("data"), hasValue("mongodb")));
+		assertThat(each, IsIterableContainingInOrder.<Object> contains("spring", "data", "mongodb"));
 	}
 
 	/**
@@ -522,16 +519,16 @@ public class UpdateMapperUnitTests {
 	public void testUpdateShouldRetainClassTypeInformationWhenUsing$addToSetWith$eachForCustomTypes() {
 
 		Update update = new Update().addToSet("models").each(new ModelImpl(2014), new ModelImpl(1), new ModelImpl(28));
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ModelWrapper.class));
 
-		DBObject addToSet = getAsDBObject(mappedObject, "$addToSet");
+		Document addToSet = getAsDocument(mappedObject, "$addToSet");
 
-		DBObject values = getAsDBObject(addToSet, "models");
-		BasicDBList each = getAsDBList(values, "$each");
+		Document values = getAsDocument(addToSet, "models");
+		List each = getAsDBList(values, "$each");
 
 		for (Object updateValue : each) {
-			assertThat(((DBObject) updateValue).get("_class").toString(),
+			assertThat(((Document) updateValue).get("_class").toString(),
 					equalTo("org.springframework.data.mongodb.core.convert.UpdateMapperUnitTests$ModelImpl"));
 		}
 	}
@@ -543,10 +540,10 @@ public class UpdateMapperUnitTests {
 	public void updateOnDbrefPropertyOfInterfaceTypeWithoutExplicitGetterForIdShouldBeMappedCorrectly() {
 
 		Update update = new Update().set("referencedDocument", new InterfaceDocumentDefinitionImpl("1", "Foo"));
-		DBObject mappedObject = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedObject = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithReferenceToInterfaceImpl.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedObject, "$set");
+		Document $set = DBObjectTestUtils.getAsDocument(mappedObject, "$set");
 		Object model = $set.get("referencedDocument");
 
 		DBRef expectedDBRef = new DBRef("interfaceDocumentDefinitionImpl", "1");
@@ -560,13 +557,13 @@ public class UpdateMapperUnitTests {
 	public void updateMapperConvertsNestedQueryCorrectly() {
 
 		Update update = new Update().pull("list", Query.query(Criteria.where("value").in("foo", "bar")));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
-		DBObject $pull = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$pull");
-		DBObject list = DBObjectTestUtils.getAsDBObject($pull, "aliased");
-		DBObject value = DBObjectTestUtils.getAsDBObject(list, "value");
-		BasicDBList $in = DBObjectTestUtils.getAsDBList(value, "$in");
+		Document $pull = DBObjectTestUtils.getAsDocument(mappedUpdate, "$pull");
+		Document list = DBObjectTestUtils.getAsDocument($pull, "aliased");
+		Document value = DBObjectTestUtils.getAsDocument(list, "value");
+		List<Object> $in = DBObjectTestUtils.getAsDBList(value, "$in");
 
 		assertThat($in, IsIterableContainingInOrder.<Object> contains("foo", "bar"));
 	}
@@ -578,13 +575,13 @@ public class UpdateMapperUnitTests {
 	public void updateMapperConvertsPullWithNestedQuerfyOnDBRefCorrectly() {
 
 		Update update = new Update().pull("dbRefAnnotatedList", Query.query(Criteria.where("id").is("1")));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithDBRefCollection.class));
 
-		DBObject $pull = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$pull");
-		DBObject list = DBObjectTestUtils.getAsDBObject($pull, "dbRefAnnotatedList");
+		Document $pull = DBObjectTestUtils.getAsDocument(mappedUpdate, "$pull");
+		Document list = DBObjectTestUtils.getAsDocument($pull, "dbRefAnnotatedList");
 
-		assertThat(list, equalTo(new BasicDBObjectBuilder().add("_id", "1").get()));
+		assertThat(list, equalTo(new org.bson.Document().append("_id", "1")));
 	}
 
 	/**
@@ -596,12 +593,12 @@ public class UpdateMapperUnitTests {
 		Update update = new Update();
 		update.unset("dbRefAnnotatedList.$");
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithDBRefCollection.class));
 
-		DBObject $unset = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$unset");
+		Document $unset = DBObjectTestUtils.getAsDocument(mappedUpdate, "$unset");
 
-		assertThat($unset, equalTo(new BasicDBObjectBuilder().add("dbRefAnnotatedList.$", 1).get()));
+		assertThat($unset, equalTo(new org.bson.Document().append("dbRefAnnotatedList.$", 1)));
 	}
 
 	/**
@@ -613,7 +610,7 @@ public class UpdateMapperUnitTests {
 		Update update = new Update().addToSet("nestedDocs").each(new NestedDocument("nested-1"),
 				new NestedDocument("nested-2"));
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DocumentWithNestedCollection.class));
 
 		assertThat(mappedUpdate, isBsonObject().notContaining("$addToSet.nestedDocs.$each.[0]._class"));
@@ -628,7 +625,7 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().addToSet("models").each(new ModelImpl(1), new ModelImpl(2));
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ListModelWrapper.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$addToSet.models.$each.[0]._class", ModelImpl.class.getName()));
@@ -644,7 +641,7 @@ public class UpdateMapperUnitTests {
 		Update update = new Update().addToSet("list").each(new ConcreteChildClass("foo", "one"),
 				new ConcreteChildClass("bar", "two"));
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ParentClass.class));
 
 		assertThat(mappedUpdate,
@@ -663,7 +660,7 @@ public class UpdateMapperUnitTests {
 		wait.interfaceType = new ModelImpl(1);
 
 		Update update = new Update().addToSet("listHoldingConcretyTypeWithInterfaceTypeAttribute").each(wait);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DomainTypeWithListOfConcreteTypesHavingSingleInterfaceTypeAttribute.class));
 
 		assertThat(mappedUpdate,
@@ -684,7 +681,7 @@ public class UpdateMapperUnitTests {
 		lmw.models = Collections.<Model> singletonList(new ModelImpl(1));
 
 		Update update = new Update().set("concreteTypeWithListAttributeOfInterfaceType", lmw);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(DomainTypeWrappingConcreteyTypeHavingListOfInterfaceTypeAttributes.class));
 
 		assertThat(mappedUpdate, isBsonObject().notContaining("$set.concreteTypeWithListAttributeOfInterfaceType._class"));
@@ -699,7 +696,7 @@ public class UpdateMapperUnitTests {
 	public void mappingShouldRetainTypeInformationForObjectValues() {
 
 		Update update = new Update().set("value", new NestedDocument("kaladin"));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithObject.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$set.value.name", "kaladin"));
@@ -713,7 +710,7 @@ public class UpdateMapperUnitTests {
 	public void mappingShouldNotRetainTypeInformationForConcreteValues() {
 
 		Update update = new Update().set("concreteValue", new NestedDocument("shallan"));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithObject.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$set.concreteValue.name", "shallan"));
@@ -727,7 +724,7 @@ public class UpdateMapperUnitTests {
 	public void mappingShouldRetainTypeInformationForObjectValuesWithAlias() {
 
 		Update update = new Update().set("value", new NestedDocument("adolin"));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithAliasedObject.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$set.renamed-value.name", "adolin"));
@@ -743,7 +740,7 @@ public class UpdateMapperUnitTests {
 		Map<Object, Object> map = Collections.<Object, Object> singletonMap("szeth", new NestedDocument("son-son-vallano"));
 
 		Update update = new Update().set("map", map);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithObjectMap.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$set.map.szeth.name", "son-son-vallano"));
@@ -760,7 +757,7 @@ public class UpdateMapperUnitTests {
 				new NestedDocument("kholin"));
 
 		Update update = new Update().set("concreteMap", map);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithObjectMap.class));
 
 		assertThat(mappedUpdate, isBsonObject().containing("$set.concreteMap.jasnah.name", "kholin"));
@@ -788,7 +785,7 @@ public class UpdateMapperUnitTests {
 		UpdateMapper mapper = new UpdateMapper(converter);
 
 		Update update = new Update().set("allocation", Allocation.AVAILABLE);
-		DBObject result = mapper.getMappedObject(update.getUpdateObject(),
+		Document result = mapper.getMappedObject(update.getUpdateObject(),
 				mappingContext.getPersistentEntity(ClassWithEnum.class));
 
 		assertThat(result, isBsonObject().containing("$set.allocation", Allocation.AVAILABLE.code));
@@ -802,11 +799,11 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().set("value", null);
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ConcreteChildClass.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
-		assertThat($set.containsField("value"), is(true));
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
+		assertThat($set.containsKey("value"), is(true));
 		assertThat($set.get("value"), nullValue());
 	}
 
@@ -818,11 +815,11 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().set("date", null);
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ClassWithJava8Date.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
-		assertThat($set.containsField("date"), is(true));
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
+		assertThat($set.containsKey("date"), is(true));
 		assertThat($set.get("value"), nullValue());
 	}
 
@@ -834,11 +831,11 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().set("values", null);
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(ListModel.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
-		assertThat($set.containsField("values"), is(true));
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
+		assertThat($set.containsKey("values"), is(true));
 		assertThat($set.get("value"), nullValue());
 	}
 
@@ -850,11 +847,11 @@ public class UpdateMapperUnitTests {
 
 		Update update = new Update().set("concreteValue.name", null);
 
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(EntityWithObject.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
-		assertThat($set.containsField("concreteValue.name"), is(true));
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
+		assertThat($set.containsKey("concreteValue.name"), is(true));
 		assertThat($set.get("concreteValue.name"), nullValue());
 	}
 
@@ -865,10 +862,10 @@ public class UpdateMapperUnitTests {
 	public void mapsAtomicIntegerToIntegerCorrectly() {
 
 		Update update = new Update().set("intValue", new AtomicInteger(10));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(SimpleValueHolder.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
 		assertThat($set.get("intValue"), Is.<Object> is(10));
 	}
 
@@ -879,10 +876,10 @@ public class UpdateMapperUnitTests {
 	public void mapsAtomicIntegerToPrimitiveIntegerCorrectly() {
 
 		Update update = new Update().set("primIntValue", new AtomicInteger(10));
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(SimpleValueHolder.class));
 
-		DBObject $set = DBObjectTestUtils.getAsDBObject(mappedUpdate, "$set");
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
 		assertThat($set.get("primIntValue"), Is.<Object> is(10));
 	}
 
@@ -1101,11 +1098,11 @@ public class UpdateMapperUnitTests {
 	}
 
 	@WritingConverter
-	static class NestedEntityWriteConverter implements Converter<NestedEntity, DBObject> {
+	static class NestedEntityWriteConverter implements Converter<NestedEntity, Document> {
 
 		@Override
-		public DBObject convert(NestedEntity source) {
-			return new BasicDBObject();
+		public Document convert(NestedEntity source) {
+			return new Document();
 		}
 	}
 
