@@ -1089,11 +1089,15 @@ public class MappingMongoConverter extends AbstractMongoConverter implements App
 		}
 
 		if (obj instanceof DBObject) {
+
 			Document newValueDbo = new Document();
+
 			for (String vk : ((DBObject) obj).keySet()) {
+
 				Object o = ((DBObject) obj).get(vk);
 				newValueDbo.put(vk, convertToMongoType(o, typeHint));
 			}
+
 			return newValueDbo;
 		}
 
@@ -1101,10 +1105,15 @@ public class MappingMongoConverter extends AbstractMongoConverter implements App
 
 			Map<String, Object> converted = new LinkedHashMap<String, Object>();
 
-			for (Map.Entry<Object, Object> entry : ((Map<Object, Object>) obj).entrySet()) {
-				converted.put(convertToMongoType(entry.getKey()).toString(), convertToMongoType(entry.getValue(),
-						typeHint != null && typeHint.getMapValueType() != null ? typeHint.getMapValueType() : typeHint));
+			for (Entry<Object, Object> entry : ((Map<Object, Object>) obj).entrySet()) {
+
+				TypeInformation<? extends Object> valueTypeHint = typeHint != null && typeHint.getMapValueType() != null
+						? typeHint.getMapValueType() : typeHint;
+
+				converted.put(convertToMongoType(entry.getKey()).toString(),
+						convertToMongoType(entry.getValue(), valueTypeHint));
 			}
+
 			return new Document(converted);
 		}
 
