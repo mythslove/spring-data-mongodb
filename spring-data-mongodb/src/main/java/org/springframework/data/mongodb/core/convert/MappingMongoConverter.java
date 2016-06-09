@@ -926,8 +926,8 @@ public class MappingMongoConverter extends AbstractMongoConverter implements App
 			Object dbObjItem = sourceValue.get(i);
 
 			if (dbObjItem instanceof DBRef) {
-				items.add(
-						DBRef.class.equals(rawComponentType) ? dbObjItem : read(componentType, readRef((DBRef) dbObjItem), path));
+				items.add(DBRef.class.equals(rawComponentType) ? dbObjItem
+						: readAndConvertDBRef((DBRef) dbObjItem, componentType, path, rawComponentType));
 			} else if (dbObjItem instanceof Document) {
 				items.add(read(componentType, (Document) dbObjItem, path));
 			} else if (dbObjItem instanceof BasicDBObject) {
@@ -995,7 +995,8 @@ public class MappingMongoConverter extends AbstractMongoConverter implements App
 			} else if (value instanceof BasicDBObject) {
 				map.put(key, read(valueType, (BasicDBObject) value, path));
 			} else if (value instanceof DBRef) {
-				map.put(key, DBRef.class.equals(rawValueType) ? value : read(valueType, readRef((DBRef) value)));
+				map.put(key, DBRef.class.equals(rawValueType) ? value
+						: readAndConvertDBRef((DBRef) value, valueType, ObjectPath.ROOT, rawValueType));
 			} else if (value instanceof List) {
 				map.put(key, readCollectionOrArray(valueType, (List) value, path));
 			} else {

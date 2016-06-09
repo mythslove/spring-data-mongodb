@@ -890,10 +890,10 @@ public class UpdateMapperUnitTests {
 	public void mapsMinCorrectly() {
 
 		Update update = new Update().min("minfield", 10);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(SimpleValueHolder.class));
 
-		assertThat(mappedUpdate, isBsonObject().containing("$min", new BasicDBObject("minfield", 10)));
+		assertThat(mappedUpdate, isBsonObject().containing("$min", new Document("minfield", 10)));
 	}
 
 	/**
@@ -903,10 +903,10 @@ public class UpdateMapperUnitTests {
 	public void mapsMaxCorrectly() {
 
 		Update update = new Update().max("maxfield", 999);
-		DBObject mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				context.getPersistentEntity(SimpleValueHolder.class));
 
-		assertThat(mappedUpdate, isBsonObject().containing("$max", new BasicDBObject("maxfield", 999)));
+		assertThat(mappedUpdate, isBsonObject().containing("$max", new Document("maxfield", 999)));
 	}
 
 	/**
@@ -930,10 +930,14 @@ public class UpdateMapperUnitTests {
 		UpdateMapper mapper = new UpdateMapper(converter);
 
 		Update update = new Update().set("enumAsMapKey", Collections.singletonMap(Allocation.AVAILABLE, 100));
-		DBObject result = mapper.getMappedObject(update.getUpdateObject(),
+		Document mappedUpdate = mapper.getMappedObject(update.getUpdateObject(),
 				mappingContext.getPersistentEntity(ClassWithEnum.class));
+		
+		Document $set = DBObjectTestUtils.getAsDocument(mappedUpdate, "$set");
+		assertThat($set.containsKey("enumAsMapKey"), is(true));
 
-		assertThat(result, isBsonObject().containing("$set.enumAsMapKey.V", 100));
+		Document enumAsMapKey = $set.get("enumAsMapKey", Document.class);
+		assertThat(enumAsMapKey.get("AVAILABLE"), is(100));
 	}
 
 	static class DomainTypeWrappingConcreteyTypeHavingListOfInterfaceTypeAttributes {

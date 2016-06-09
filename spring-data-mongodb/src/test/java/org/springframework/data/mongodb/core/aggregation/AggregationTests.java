@@ -246,10 +246,10 @@ public class AggregationTests {
 
 		assumeTrue(mongoVersion.isGreaterThanOrEqualTo(THREE_DOT_TWO));
 
-		DBCollection coll = mongoTemplate.getCollection(INPUT_COLLECTION);
+		MongoCollection<Document> coll = mongoTemplate.getCollection(INPUT_COLLECTION);
 
-		coll.insert(createDocument("Doc1", "spring", "mongodb", "nosql"));
-		coll.insert(createDocument("Doc2"));
+		coll.insertOne(createDocument("Doc1", "spring", "mongodb", "nosql"));
+		coll.insertOne(createDocument("Doc2"));
 
 		Aggregation agg = newAggregation( //
 				project("tags"), //
@@ -277,10 +277,10 @@ public class AggregationTests {
 
 		assumeTrue(mongoVersion.isGreaterThanOrEqualTo(THREE_DOT_TWO));
 
-		DBCollection coll = mongoTemplate.getCollection(INPUT_COLLECTION);
+		MongoCollection<Document> coll = mongoTemplate.getCollection(INPUT_COLLECTION);
 
-		coll.insert(createDocument("Doc1", "spring", "mongodb", "nosql"));
-		coll.insert(createDocument("Doc2"));
+		coll.insertOne(createDocument("Doc1", "spring", "mongodb", "nosql"));
+		coll.insertOne(createDocument("Doc2"));
 
 		Aggregation agg = newAggregation( //
 				project("tags"), //
@@ -288,11 +288,11 @@ public class AggregationTests {
 				sort(DESC, "n") //
 		);
 
-		AggregationResults<DBObject> results = mongoTemplate.aggregate(agg, INPUT_COLLECTION, DBObject.class);
+		AggregationResults<Document> results = mongoTemplate.aggregate(agg, INPUT_COLLECTION, Document.class);
 
 		assertThat(results, is(notNullValue()));
 
-		List<DBObject> tagCount = results.getMappedResults();
+		List<Document> tagCount = results.getMappedResults();
 
 		assertThat(tagCount, is(notNullValue()));
 		assertThat(tagCount.size(), is(4));
