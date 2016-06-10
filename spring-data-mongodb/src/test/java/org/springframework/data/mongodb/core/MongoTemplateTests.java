@@ -349,7 +349,7 @@ public class MongoTemplateTests {
 		assertThat(indexInfo.size(), is(2));
 		Object indexKey = null;
 		boolean unique = false;
-		boolean dropDupes = false;
+		Boolean dropDupes = false;
 		for (org.bson.Document ix : indexInfo) {
 
 			if ("age_-1".equals(ix.get("name"))) {
